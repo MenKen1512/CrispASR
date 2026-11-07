@@ -607,7 +607,6 @@ TEST_CASE("the flutter chat binding surfaces the disclosure", "[unit][compliance
     REQUIRE(contains(src, "crispasr_chat_ai_disclosure_text"));
 }
 
-
 TEST_CASE("HTTP TTS refuses an unavailable required spoken disclosure before success headers",
           "[unit][compliance][marking]") {
     // Qwen3-TTS Base needs a reference voice: its neutral disclaimer synth
