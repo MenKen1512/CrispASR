@@ -606,3 +606,35 @@ TEST_CASE("the flutter chat binding surfaces the disclosure", "[unit][compliance
     REQUIRE(contains(src, "aiDisclosureText"));
     REQUIRE(contains(src, "crispasr_chat_ai_disclosure_text"));
 }
+
+
+TEST_CASE("HTTP TTS refuses an unavailable required spoken disclosure before success headers",
+          "[unit][compliance][marking]") {
+    // Qwen3-TTS Base needs a reference voice: its neutral disclaimer synth
+    // returns empty. Previously buffered and streaming routes nevertheless
+    // sent X-Crispasr-Spoken-Disclaimer: applied on a successful response.
+    // The source-level gate must precede both route branches, not just the
+    // HTTP header assignment (the actual model failure is a live-tier test).
+    const std::string src = read_file("examples/cli/crispasr_server.cpp");
+    const size_t gate = src.find("if (crispasr_tts_get_disclaimer(backend.get(), disclosure_params).empty())");
+    const size_t refuse = src.find("json_error(res, 503,", gate);
+    const size_t code = src.find("\"spoken_disclaimer_unavailable\"", refuse);
+    const size_t stream = src.find("if (stream) {", gate);
+    const size_t headers = src.find("set_marking_headers(res);", gate);
+    const size_t buffered = src.find("crispasr_tts_concat_with_silence(chunks,", stream);
+    const size_t suppression = src.rfind("disclosure_params.tts_capture_suppress = true;", gate);
+
+    REQUIRE(gate != std::string::npos);
+    REQUIRE(refuse != std::string::npos);
+    REQUIRE(code != std::string::npos);
+    REQUIRE(stream != std::string::npos);
+    REQUIRE(headers != std::string::npos);
+    REQUIRE(buffered != std::string::npos);
+    REQUIRE(suppression != std::string::npos);
+    REQUIRE(suppression < gate);
+    REQUIRE(gate < refuse);
+    REQUIRE(refuse < code);
+    REQUIRE(code < stream);
+    REQUIRE(gate < headers);
+    REQUIRE(stream < buffered);
+}
