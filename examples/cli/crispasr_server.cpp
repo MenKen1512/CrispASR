@@ -3031,6 +3031,23 @@ int crispasr_run_server(whisper_params& params, const std::string& host, int por
         // Exact duration wins over speed for backends that honour it (omnivoice).
         rp.tts_duration = duration_s;
 
+        // An opt-out decision is not proof that an audible disclosure exists.
+        // Base TTS backends can return empty audio when asked to synthesize
+        // without a reference voice. Check the cached neutral disclaimer before
+        // *either* streaming commits 200/headers or buffered synthesis starts.
+        // Never claim "applied" and return a playable, undisclosed clone.
+        if (apply_spoken_disclaimer) {
+            whisper_params disclosure_params = rp;
+            disclosure_params.tts_capture_suppress = true;
+            std::lock_guard<std::mutex> lock(model_mutex);
+            if (crispasr_tts_get_disclaimer(backend.get(), disclosure_params).empty()) {
+                json_error(res, 503,
+                           "spoken AI-disclosure unavailable: backend could not synthesize a neutral disclaimer",
+                           "spoken_disclaimer_unavailable");
+                return;
+            }
+        }
+
         bool stream = body.value("stream", false);
 
         // Long-form chunking (PLAN §75d / issue #66): split input on
